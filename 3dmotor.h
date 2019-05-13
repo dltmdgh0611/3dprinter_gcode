@@ -46,7 +46,6 @@ int count_x, count_y;
 ////counts////
 
 bool toggle_init_x = true, toggle_init_y = true;
-bool toggle_pos_x = false, toggle_pos_y = false;
 bool toggle_x, toggle_y;
 bool toggle_stop_x, toggle_stop_y, toggle_draw_start;
 ////toggles////
@@ -55,17 +54,21 @@ bool toggle_stop_x, toggle_stop_y, toggle_draw_start;
 unsigned long position_x, position_y;
 int moving_x, moving_y;
 int angle_tan = (int)((5000 * radius));
+int center_x;
 ////positions////
 
 unsigned long per, per2;
-int X_PWM = 200;
-int Y_PWM = 200;
+int X_PWM = 30;
+int Y_PWM = 30;
 //int Y_PWM = (int)(100 * (5000 / (float)angle_tan));
 ////PWM////
 
 
 
 void choice_dir(int stepx, int stepy) {
+	Serial.print(stepx);
+	Serial.print(" ");
+	Serial.println(stepy);
 	if (stepx < 0) digitalWrite(X_DIR_PIN, 1);
 	else digitalWrite(X_DIR_PIN, 0);
 	if (stepy < 0) digitalWrite(Y_DIR_PIN, 1);
@@ -73,6 +76,7 @@ void choice_dir(int stepx, int stepy) {
 }
 void Moving(int stepx, int stepy)
 {
+	choice_dir(stepx, stepy);
 	if (stepx == 0)
 	{
 		toggle_stop_y = 0;
@@ -90,9 +94,22 @@ void Moving(int stepx, int stepy)
 		moving_x = stepx;
 		moving_y = stepy;
 	}
-	choice_dir(stepx, stepy);
 }
-
+void moving_center(int center_x, int center_y)
+{
+	center_x = 14000 - position_x;
+	center_y = 12000 - position_y;
+	Moving(center_x, center_y);
+}
+void moving_zero()
+{
+	toggle_stop_x = 0;
+	toggle_stop_y = 0;
+	toggle_init_x = true;
+	toggle_init_y = true;
+	digitalWrite(X_DIR_PIN, 1);
+	digitalWrite(Y_DIR_PIN, 1);
+}
 void firstSetting()
 {
 	Serial.begin(115200);
@@ -111,7 +128,6 @@ void firstSetting()
 	digitalWrite(Y_ENABLE_PIN, 0);
 	digitalWrite(X_DIR_PIN, 1);
 	digitalWrite(Y_DIR_PIN, 1);
-	toggle_pos_x = 0;
 	toggle_init_x = true, toggle_init_y = true;
 	for (int i = 0; i < 480; i++) {
 		renew_xy_pos[i][0] = (int((xy_pos[i][0] - xy_pos[i - 1][0]) / 0.01 + 0.5));
@@ -131,12 +147,6 @@ void draw_gcode() {
 		radius = abs(atan(renew_xy_pos[gcode_count+1][1] / renew_xy_pos[gcode_count+1][0]));
 		X_PWM = abs((int)(200.0 / cos(radius)));
 		Y_PWM = abs((int)(200.0 / sin(radius)));
-
-		/*Serial.println("x : " + String(renew_xy_pos[gcode_count][0]) + " y : " + String(renew_xy_pos[gcode_count][1]));
-		Serial.println("angle(degree) : " + String((int)((radius / PI) * 180)));
-		Serial.println("X_PWM : " + String(X_PWM));
-		Serial.println("Y_PWM : " + String(Y_PWM));
-		Serial.println();*/
 		Moving((renew_xy_pos[gcode_count + 1][0]), (renew_xy_pos[gcode_count + 1][1]));
 		gcode_count++;
 		if (gcode_count > 480)
@@ -152,41 +162,27 @@ void Input_Key()
 	{
 		char key = Serial.read();
 		if (key == 'a') {
-			X_PWM = Y_PWM = 200;
-			Moving(5000, 0);
+			X_PWM = Y_PWM = 50;
+			Moving(-200, 0);
 		}
 		if (key == 'd') {
-			X_PWM = Y_PWM = 200;
-			Moving(-5000, 0);
+			X_PWM = Y_PWM = 50;
+			Moving(200, 0);
 		}
 		if (key == 'w') {
-			X_PWM = Y_PWM = 200;
-			Moving(0, 5000);
+			X_PWM = Y_PWM = 50;
+			Moving(0, -200);
 		}
 		if (key == 's') {
-			X_PWM = Y_PWM = 200;
-			Moving(0, -5000);
+			X_PWM = Y_PWM = 50;
+			Moving(0, 200);
 		}
 		if (key == 'r') {
-			toggle_stop_x = 0;
-			toggle_stop_y = 0;
-			digitalWrite(X_DIR_PIN, 1);
-			digitalWrite(Y_DIR_PIN, 1);
-			toggle_init_x = true;
-			toggle_init_y = true;
+			moving_zero();
 		}
-		if (key == 'o')
-		{
-			if (position_y > 11500) digitalWrite(Y_DIR_PIN, 1);
-			else digitalWrite(Y_DIR_PIN, 0);
-			if (position_x > 12500) digitalWrite(X_DIR_PIN, 1);
-			else digitalWrite(X_DIR_PIN, 0);
-			toggle_stop_x = 0;
-			toggle_stop_y = 0;
-			toggle_pos_x = true;
-			toggle_pos_y = true;
+		if (key == 'o'){
+			moving_center(position_x, position_y);
 		}
-		
 		if (key == 'm') {
 			toggle_draw_start = 1;
 		}
@@ -208,7 +204,6 @@ void Input_Key()
 		}
 	}
 }
-
 void limit_switch(char xy)
 {
 	if (xy == 'x')
@@ -236,7 +231,7 @@ void limit_position(char xy)
 {
 	if (xy == 'x')
 	{
-		if (position_x >= 19000)
+		if (position_x >= 24000)
 		{
 			if (!(digitalRead(X_DIR_PIN))) toggle_stop_x = 1;
 			else toggle_stop_x = 0;
@@ -244,57 +239,12 @@ void limit_position(char xy)
 	}
 	else
 	{
-		if (position_y >= 18000)
+		if (position_y >= 21000)
 		{
 			if (!(digitalRead(Y_DIR_PIN))) toggle_stop_y = 1;
 			else toggle_stop_y = 0;
 		}
 
-	}
-}
-void center_position(char xy)
-{
-	if (xy == 'x')
-	{
-		if (position_x == 12500&&toggle_pos_x)
-		{
-			toggle_stop_x = 1;
-			toggle_pos_x = false;
-			
-		}
-	}
-	else
-	{
-		if (position_y == 11500&&toggle_pos_y)
-		{
-			toggle_stop_y = 1;
-			toggle_pos_y = false;
-			
-		}
-		
-	}
-}
-void MOVE_XY_Absolute(char xy, int pos) {
-	if (xy == 'x')
-	{
-
-		if (position_x == pos)
-		{
-			if (position_x > 12500 + moving_x) digitalWrite(X_DIR_PIN, 1);
-			else digitalWrite(X_DIR_PIN, 0);
-			toggle_stop_x = 1;
-			toggle_pos_x = false;
-		}
-	}
-	else
-	{
-		if (position_y == pos)
-		{
-			if (position_y > 11500 + moving_y) digitalWrite(Y_DIR_PIN, 1);
-			else digitalWrite(Y_DIR_PIN, 0);
-			toggle_stop_y = 1;
-			toggle_pos_y = false;
-		}
 	}
 }
 void PWM(char xy)
@@ -308,7 +258,6 @@ void PWM(char xy)
 			else position_x++;
 
 			if (toggle_init_x) count_x = 0;
-			else if (toggle_pos_x) count_x = 0;
 			else if (count_x >= abs(moving_x))
 			{
 				toggle_stop_x = 1;
@@ -333,7 +282,6 @@ void PWM(char xy)
 			else position_y++;
 
 			if (toggle_init_y) count_y = 0;
-			else if (toggle_pos_y) count_y = 0;
 			else if (count_y >= abs(moving_y))
 			{
 				toggle_stop_y = 1;
@@ -357,7 +305,6 @@ void MOVE_XY_Relative(unsigned long cur) {
 		per = cur;
 		limit_switch('x');
 		limit_position('x');
-		center_position('x');
 		PWM('x');
 	}
 	if (cur - per2 >= Y_PWM && toggle_stop_y == 0)
@@ -365,7 +312,6 @@ void MOVE_XY_Relative(unsigned long cur) {
 		per2 = cur;
 		limit_switch('y');
 		limit_position('y');
-		center_position('y');
 		PWM('y');
 	}
 	if (toggle_stop_x&&toggle_stop_y) draw_gcode();

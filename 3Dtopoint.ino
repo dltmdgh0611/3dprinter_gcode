@@ -1,5 +1,4 @@
 #include "3dmotor.h"
-
 void setup() {
 	firstSetting();
 }
